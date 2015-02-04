@@ -17,6 +17,11 @@
 
 package org.apache.nutch.util;
 
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
@@ -57,6 +62,24 @@ public class NutchConfiguration {
    */
   public static Configuration create() {
     Configuration conf = new Configuration();
+    List<URL> nutchConfigurationClasspathURLs = new ArrayList<URL>();
+
+    // Collect classpath URLs from Hadoop's Configuration class CL
+    URLClassLoader hadoopBundleConfigurationClassLoader = (URLClassLoader) conf.getClassLoader();
+    for (URL hadoopBundleClasspathURL : hadoopBundleConfigurationClassLoader.getURLs()) {
+      nutchConfigurationClasspathURLs.add(hadoopBundleClasspathURL);
+    }
+
+    // Append classpath URLs from current thread, which ostensibly include a Nutch job file
+    URLClassLoader tccl = (URLClassLoader) Thread.currentThread().getContextClassLoader();
+    for (URL tcclClasspathURL : tccl.getURLs()) {
+      nutchConfigurationClasspathURLs.add(tcclClasspathURL);
+    }
+
+    URLClassLoader nutchConfigurationClassLoader = new URLClassLoader(nutchConfigurationClasspathURLs.toArray(new URL[0]));
+    // Reset the Configuration object's CL to the new one
+    conf.setClassLoader(nutchConfigurationClassLoader);
+
     setUUID(conf);
     addNutchResources(conf);
     return conf;
